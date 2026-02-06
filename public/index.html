@@ -1,23 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Build Orchestrator Dashboard</title>
+    <title>Build Orchestrator | Dashboard</title>
     <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Using a "Cyberpunk/Dev" color palette */
             --bg-color: #0d1117;
+            /* GitHub Dark Dimmed */
             --text-color: #c9d1d9;
             --card-bg: #161b22;
             --border-color: #30363d;
             --accent: #58a6ff;
+            /* Blue */
             --success: #238636;
+            /* Green */
             --error: #da3633;
+            /* Red */
+            --warning: #d29922;
+            /* Yellow */
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'JetBrains Mono', monospace;
+            /* The "Hacker" font */
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
@@ -25,7 +32,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -35,81 +42,190 @@
             align-items: center;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
 
-        h1 { margin: 0; font-size: 24px; color: var(--accent); }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+            /* Neon glow */
+        }
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 300px 1fr;
+            grid-template-columns: 350px 1fr;
             gap: 20px;
+            height: calc(100vh - 120px);
         }
 
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
 
-        h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        .card-header {
+            padding: 15px;
+            background-color: #21262d;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .build-list { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; }
+        .build-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
         .build-item {
-            padding: 10px;
+            padding: 15px;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
         }
-        .build-item:hover { background-color: #21262d; }
-        .build-item.active { border-left: 3px solid var(--accent); background-color: #21262d; }
 
-        .status { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-        .status.running { background-color: #1f6feb; color: white; }
-        .status.success { background-color: var(--success); color: white; }
-        .status.failed { background-color: var(--error); color: white; }
-        .status.pending { background-color: #6e7681; color: white; }
+        .build-item:hover {
+            background-color: #21262d;
+            padding-left: 20px;
+            /* Slight movement effect */
+        }
+
+        .build-item.active {
+            border-left: 4px solid var(--accent);
+            background-color: rgba(88, 166, 255, 0.1);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-badge.running {
+            background-color: rgba(31, 111, 235, 0.2);
+            color: #58a6ff;
+            border: 1px solid #1f6feb;
+            animation: pulse 2s infinite;
+        }
+
+        .status-badge.success {
+            background-color: rgba(35, 134, 54, 0.2);
+            color: #3fb950;
+            border: 1px solid #238636;
+        }
+
+        .status-badge.failed {
+            background-color: rgba(218, 54, 51, 0.2);
+            color: #f85149;
+            border: 1px solid #da3633;
+        }
+
+        .status-badge.pending {
+            background-color: rgba(110, 118, 129, 0.2);
+            color: #8b949e;
+            border: 1px solid #6e7681;
+        }
 
         #logs {
-            background-color: #000;
+            background-color: #0d1117;
             color: #ccc;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 15px;
-            height: 500px;
+            padding: 20px;
+            flex-grow: 1;
             overflow-y: auto;
-            border-radius: 6px;
             white-space: pre-wrap;
-            font-size: 14px;
+            font-size: 13px;
+            line-height: 1.5;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .log-line-timestamp {
+            color: #8b949e;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background-color: var(--success);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
-            <h1>Build Orchestrator</h1>
-            <button onclick="triggerSampleBuild()" style="padding: 8px 16px; background: var(--success); border: none; color: white; cursor: pointer; border-radius: 4px;">Trigger Sample Build</button>
+            <div>
+                <h1>⚡ Build Orchestrator</h1>
+                <small style="color: #8b949e;">Major Project v1.0 • Connected to Engine</small>
+            </div>
+            <button onclick="triggerSampleBuild()" class="btn-primary">▶ Run Test Build</button>
         </header>
 
         <div class="dashboard-grid">
             <!-- Sidebar: Recent Builds -->
             <div class="card">
-                <h2>Recent Builds</h2>
+                <div class="card-header">
+                    HISTORY
+                    <span style="font-size: 12px; font-weight: normal; color: #8b949e;">Recent executions</span>
+                </div>
                 <ul id="buildList" class="build-list">
-                    <!-- Builds will leverage here -->
-                    <li style="padding:10px; color: #8b949e;">Loading...</li>
+                    <li style="padding:20px; text-align: center; color: #8b949e;">Loading history...</li>
                 </ul>
             </div>
 
             <!-- Main: Logs -->
             <div class="card">
-                <h2 id="logHeader">Live Logs <span id="currentStatus" class="status pending">Waiting</span></h2>
-                <div id="logs">// Select a build to view logs...</div>
+                <div class="card-header">
+                    CONSOLE OUTPUT
+                    <span id="currentStatus" class="status-badge pending">IDLE</span>
+                </div>
+                <div id="logs">// Waiting for selection...</div>
             </div>
         </div>
     </div>
 
     <script src="app.js"></script>
 </body>
+
 </html>

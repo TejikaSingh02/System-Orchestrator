@@ -28,12 +28,16 @@ class Orchestrator {
     }
 
     /**
-     * Triggers a new build based on a config.
-     * @param {Object} buildConfig - The build definition JSON
-     * @param {String} triggerType - 'manual' or 'webhook'
+     * The main function to trigger a build.
+     * It decides whether to save to DB or just keep it in memory.
+     * @param {Object} buildConfig - The tasks directly from the JSON body
+     * @param {String} triggerType - Who triggered this? (manual/webhook)
      */
     async triggerBuild(buildConfig, triggerType = 'manual') {
         let build;
+
+        // Check if DB is ready, otherwise fallback to RAM (Map)
+        // This was a lifesaver during college presentation when Mongo crashed!
         if (this.isDbConnected) {
             build = new Build({
                 status: 'pending',
@@ -44,8 +48,9 @@ class Orchestrator {
             });
             await build.save();
         } else {
-            console.warn('DB disconnected. Using In-Memory storage.');
+            console.warn('⚠️  Database not connected. Saving build to Memory.');
             const id = crypto.randomUUID();
+            // Mocking the Mongoose object structure so the rest of the code doesn't break
             build = {
                 _id: id,
                 status: 'pending',
@@ -53,94 +58,124 @@ class Orchestrator {
                 startTime: new Date(),
                 triggeredBy: 'user',
                 logs: [],
-                save: async function () { memoryBuilds.set(this._id.toString(), this); return this; } // Mock save
+                // Mock save function
+                save: async function () {
+                    memoryBuilds.set(this._id.toString(), this);
+                    return this;
+                }
             };
             memoryBuilds.set(id, build);
         }
 
+        // Notify frontend immediately that a build is queued
         this.emit('build-start', build);
 
-        // Run asynchronously to not block API
+        // Execute the build pipeline asynchronously.
+        // We don't await this because we want to return the Build ID to the user ASAP.
         this.runBuild(build, buildConfig).catch(err => {
-            console.error('Build execution error:', err);
+            console.error('❌ Critical execution error:', err);
+
+            // If the whole runner crashes, mark build as failed
             build.status = 'failed';
             build.endTime = new Date();
-            build.logs.push(`Critical Error: ${err.message}`);
+            const errorMsg = `Critical Error: ${err.message}`;
+            build.logs.push(errorMsg);
+
             if (typeof build.save === 'function') build.save();
 
             this.emit('build-update', build);
-            this.emit('log', { buildId: build._id, message: `Critical Error: ${err.message}` });
+            this.emit('log', { buildId: build._id, message: errorMsg });
         });
 
         return build;
     }
 
+    /**
+     * Core Logic: Resolves the DAG and executes layers.
+     */
     async runBuild(build, config) {
         try {
+            // Update status to running
             build.status = 'running';
             if (typeof build.save === 'function') await build.save();
 
             this.emit('build-update', build);
-            this.emit('log', { buildId: build._id, message: 'Build started...' });
-            build.logs.push('Build started...');
+            this.broadcastLog(build, '🚀 Build pipeline started...');
 
-            // 1. Git Change Detection
+            // Step 1: Check for changed files (Git Integration)
+            // If specific files are changed, we might skip some tasks (Implementation pending)
             const changedFiles = await GitService.getChangedFiles();
             const runAll = changedFiles === null;
 
-            const msg1 = `Changed files: ${runAll ? 'ALL (Full Rebuild)' : changedFiles.join(', ')}`;
-            build.logs.push(msg1);
-            this.emit('log', { buildId: build._id, message: msg1 });
+            const changeMsg = `📂 Changed files: ${runAll ? 'ALL (Full Rebuild)' : changedFiles.join(', ')}`;
+            this.broadcastLog(build, changeMsg);
 
-            // 2. Build Dependency Graph
-            const tasks = config.tasks.map(t => ({ ...t })); // Clone
+            // Step 2: Build the Dependency Graph (DAG)
+            // We clone the tasks array to avoid modifying the original config
+            const tasks = config.tasks.map(t => ({ ...t }));
             const executionLayers = GraphService.buildDependencyGraph(tasks);
 
-            const msg2 = `Execution Plan: ${JSON.stringify(executionLayers)}`;
-            build.logs.push(msg2);
-            this.emit('log', { buildId: build._id, message: msg2 });
+            const planMsg = `📋 Execution Plan (Layers): ${JSON.stringify(executionLayers)}`;
+            this.broadcastLog(build, planMsg);
 
-            // 3. Execute Layers
-            for (const layer of executionLayers) {
+            // Step 3: Execute each layer sequentially
+            // Tasks INSIDE a layer run in Parallel (Promise.all)
+            for (const [index, layer] of executionLayers.entries()) {
                 const tasksToRun = layer.map(taskId => tasks.find(t => t.id === taskId));
 
-                const msg3 = `Starting Layer: ${layer.join(', ')}`;
-                build.logs.push(msg3);
-                this.emit('log', { buildId: build._id, message: msg3 });
+                const layerMsg = `\n⚡ [Layer ${index + 1}] Starting parallel execution: ${layer.join(', ')}`;
+                this.broadcastLog(build, layerMsg);
 
+                // Map each task to an execution promise
                 const promises = tasksToRun.map(task => ExecutorService.executeTask(task, build._id));
 
+                // Wait for ALL tasks in this layer to finish called "Barrier Synchronization"
                 const results = await Promise.allSettled(promises);
 
+                // Check for failures
                 const failures = results.filter(r => r.status === 'rejected');
                 if (failures.length > 0) {
-                    throw new Error(`Layer failed: ${failures.map(f => f.reason.id).join(', ')}`);
+                    throw new Error(`Execution stopped. Failed tasks: ${failures.map(f => f.reason.id).join(', ')}`);
                 }
 
+                // Log success for this layer
                 results.forEach(r => {
-                    const msg4 = `Task ${r.value.id} completed.`;
-                    build.logs.push(msg4);
-                    this.emit('log', { buildId: build._id, message: msg4 });
+                    this.broadcastLog(build, `✅ Task '${r.value.id}' completed.`);
                 });
+
+                // Save progress
                 if (typeof build.save === 'function') await build.save();
             }
 
+            // Mark as Success
             build.status = 'success';
             build.endTime = new Date();
-            build.logs.push('Build completed successfully.');
+            this.broadcastLog(build, '\n✨ Build Cycle Completed Successfully.');
+
             if (typeof build.save === 'function') await build.save();
 
-            this.emit('log', { buildId: build._id, message: 'Build completed successfully.' });
             this.emit('build-update', build);
 
         } catch (error) {
+            // Handle logical errors (like task failure)
             build.status = 'failed';
             build.endTime = new Date();
-            build.logs.push(`Build failed: ${error.message}`);
-            if (typeof build.save === 'function') await build.save();
+            this.broadcastLog(build, `\n⛔ Build Failed: ${error.message}`);
 
-            this.emit('log', { buildId: build._id, message: `Build failed: ${error.message}` });
+            if (typeof build.save === 'function') await build.save();
             this.emit('build-update', build);
+        }
+    }
+
+    // Helper to log to both Socket.io and save to our build object's log history
+    // Keeping it simple so I don't have to write duplicate code everywhere!
+    broadcastLog(build, message) {
+        // 1. Emit to Frontend (Real-time updates)
+        this.emit('log', { buildId: build._id, message });
+
+        // 2. Save to the build object (so it's stored in DB/Memory)
+        if (build.logs) {
+            build.logs.push(message);
         }
     }
 

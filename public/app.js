@@ -1,45 +1,66 @@
 const socket = io();
 let currentBuildId = null;
 
-// Listen for connection
+// ==========================================
+// Socket.io Event Listeners
+// ==========================================
+
 socket.on('connect', () => {
-    console.log('Connected to WebSocket server');
+    console.log('✅ Connected to Orchestrator Server');
     fetchBuilds();
 });
 
-// Event Listeners
 socket.on('build-start', (build) => {
-    fetchBuilds(); // Refresh list
-    if (!currentBuildId) selectBuild(build._id); // Auto-select if none selected
+    // If a new build starts, refresh the list to show it immediately
+    fetchBuilds();
+    // If I'm not looking at another build, auto-switch to the new one
+    if (!currentBuildId) selectBuild(build._id);
 });
 
 socket.on('build-update', (build) => {
+    // Ideally we should just update the specific DOM element to save bandwidth,
+    // but for this project, just re-fetching the list is safer and easier.
     updateBuildInList(build);
+
+    // If we are viewing this build, update the header status
     if (currentBuildId === build._id) {
-        document.getElementById('currentStatus').className = `status ${build.status}`;
-        document.getElementById('currentStatus').innerText = build.status.toUpperCase();
+        setStatus(build.status);
     }
 });
 
 socket.on('log', (data) => {
+    // Only append logs if we are watching THIS build
     if (currentBuildId === data.buildId) {
         appendLog(data.message);
     }
 });
 
-// Fetch Recent Builds
+// ==========================================
+// Core Functions
+// ==========================================
+
 async function fetchBuilds() {
-    const res = await fetch('/api/builds');
-    const builds = await res.json();
-    renderBuildList(builds);
+    try {
+        const res = await fetch('/api/builds');
+        const builds = await res.json();
+        renderBuildList(builds);
+    } catch (e) {
+        console.error("Failed to fetch builds!", e);
+    }
 }
 
 function renderBuildList(builds) {
     const list = document.getElementById('buildList');
     list.innerHTML = '';
 
+    if (builds.length === 0) {
+        list.innerHTML = '<li style="padding:20px; text-align: center; color: #8b949e;">No builds yet. Trigger one!</li>';
+        return;
+    }
+
     builds.forEach(build => {
         const li = document.createElement('li');
+        // 'active' class highlights the selected build
         li.className = `build-item ${currentBuildId === build._id ? 'active' : ''}`;
         li.onclick = () => selectBuild(build._id);
 
@@ -47,9 +68,9 @@ function renderBuildList(builds) {
         li.innerHTML = `
             <div>
                 <strong>#${build._id.substr(0, 8)}</strong><br>
-                <span style="color: #8b949e; font-size: 12px;">${date}</span>
+                <span style="color: #8b949e; font-size: 11px;">${date}</span>
             </div>
-            <span class="status ${build.status}">${build.status}</span>
+            <span class="status-badge ${build.status}">${build.status}</span>
         `;
         list.appendChild(li);
     });
@@ -57,45 +78,62 @@ function renderBuildList(builds) {
 
 async function selectBuild(id) {
     currentBuildId = id;
-    fetchBuilds(); // Re-render to show active state
+    fetchBuilds(); // Re-render to update the 'active' highlight
 
-    // Clear logs and show status
+    // UX: Show loading state in logs
     const logsDiv = document.getElementById('logs');
-    logsDiv.innerHTML = 'Loading logs...';
+    logsDiv.innerHTML = '<span style="color: #6e7681;">> Fetching logs...</span>';
 
-    // Fetch full details
+    // Fetch full details from API
     const res = await fetch(`/api/build/${id}`);
     const build = await res.json();
 
-    document.getElementById('currentStatus').className = `status ${build.status}`;
-    document.getElementById('currentStatus').innerText = build.status.toUpperCase();
+    setStatus(build.status);
 
-    logsDiv.innerHTML = build.logs.join('\n');
-    logsDiv.scrollTop = logsDiv.scrollHeight;
+    // Clear and show logs
+    logsDiv.innerHTML = '';
+    if (build.logs.length === 0) {
+        logsDiv.innerHTML = '<span style="color: #6e7681;">> Output is empty...</span>';
+    } else {
+        build.logs.forEach(msg => appendLog(msg));
+    }
 }
 
 function appendLog(message) {
     const logsDiv = document.getElementById('logs');
-    logsDiv.innerHTML += '\n' + message;
-    logsDiv.scrollTop = logsDiv.scrollHeight;
+    // Add a satisfying little timestamp to each log line
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const line = `<div><span class="log-line-timestamp">[${time}]</span> ${message}</div>`;
+
+    logsDiv.insertAdjacentHTML('beforeend', line);
+    logsDiv.scrollTop = logsDiv.scrollHeight; // Auto-scroll to bottom
+}
+
+function setStatus(status) {
+    const el = document.getElementById('currentStatus');
+    el.className = `status-badge ${status}`;
+    el.innerText = status.toUpperCase();
 }
 
 function updateBuildInList(build) {
-    // Ideally update specific item, effectively we can just refetch for simplicity
     fetchBuilds();
 }
 
 async function triggerSampleBuild() {
+    // This defines a sample build for the demo. 
+    // In a real version, this would be computed from the repo.
     const buildConfig = {
         tasks: [
             { id: 'clean', command: 'echo "Cleaning environment..."', dependencies: [] },
             { id: 'install', command: 'echo "Installing dependencies..."', dependencies: ['clean'] },
-            { id: 'build', command: 'echo "Compiling assets..."', dependencies: ['install'] },
-            { id: 'test', command: 'echo "Running integration tests..."', dependencies: ['build'] },
-            { id: 'deploy', command: 'echo "Deploying to staging..."', dependencies: ['test'] }
+            { id: 'build:backend', command: 'echo "Compiling Backend..."', dependencies: ['install'] },
+            { id: 'build:frontend', command: 'echo "Compiling Frontend..."', dependencies: ['install'] },
+            { id: 'test', command: 'echo "Running integration tests..."', dependencies: ['build:backend', 'build:frontend'] },
+            { id: 'deploy', command: 'echo "Deploying to Staging..."', dependencies: ['test'] }
         ]
     };
 
+    console.log("Triggering build...");
     await fetch('/api/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

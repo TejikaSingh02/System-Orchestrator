@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Start Server",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/server.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Run Verification Script",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/scripts/verify_build.js",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
