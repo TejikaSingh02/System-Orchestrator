@@ -2,7 +2,7 @@ services:
   - type: web
     name: system-orchestrator
     env: node
-    buildCommand: ""
+    buildCommand: npm install
     startCommand: node src/server.js
     plan: free
     envVars:
