@@ -1,6 +1,15 @@
 # Build Orchestrator - Automated CI/CD Pipeline System  
 *(Major Project - Final Year B.Tech)*  
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-system--orchestrator.onrender.com-brightgreen?style=for-the-badge&logo=render)](https://system-orchestrator.onrender.com)  
+[![GitHub](https://img.shields.io/badge/GitHub-TejikaSingh02%2FSystem--Orchestrator-blue?style=for-the-badge&logo=github)](https://github.com/TejikaSingh02/System-Orchestrator)  
+
+## 🌐 Live Demo  
+> **[https://system-orchestrator.onrender.com](https://system-orchestrator.onrender.com)**  
+> Open the dashboard, pick a demo scenario from the dropdown, and click **▶ Run Build** to see the orchestrator in action.  
+
+---  
+
 ## 🚀 Project Overview  
 This is a **Build Orchestration System** I built to understand how tools like Jenkins or GitHub Actions work under the hood. The core idea is simple: **running tasks one by one is slow**. If "Frontend Build" and "Backend Build" don't depend on each other, they should run at the same time!  
 
@@ -63,8 +72,18 @@ Instead of refreshing the page to see if a build finished, I used **Socket.io**.
 
 ---  
 
-## 📸 Screenshots  
-*(Place your dashboard screenshots here)*  
+## 📸 Live Demo  
+
+🔗 **Dashboard**: [https://system-orchestrator.onrender.com](https://system-orchestrator.onrender.com)  
+
+The dashboard supports **5 real-life demo scenarios**:  
+| Scenario | What it shows |  
+|---|---|  
+| 🩺 Project Health Check | Sequential pipeline — env → file validation → deps |  
+| ⚡ Parallel Code Analysis | Real parallel execution via `Promise.allSettled` |  
+| 🔀 Full Real Pipeline (4 Layers) | Kahn's Algorithm across 4 dependency layers |  
+| 💥 Failure Handling Demo | Pipeline halts on real error, status turns red |  
+| 🏗️ Full CI/CD — All Real Tasks | Runs all scripts, generates `dist/build-report.json` |  
 
 ---  
 
@@ -86,8 +105,8 @@ Instead of refreshing the page to see if a build finished, I used **Socket.io**.
 ### Steps  
 1. **Clone the Repo**  
    ```bash  
-   git clone https://github.com/your-username/build-orchestrator.git  
-   cd build-orchestrator  
+   git clone https://github.com/TejikaSingh02/System-Orchestrator.git  
+   cd System-Orchestrator  
    ```  
 
 2. **Install Dependencies**  
@@ -101,8 +120,11 @@ Instead of refreshing the page to see if a build finished, I used **Socket.io**.
    ```  
    *Server starts at `http://localhost:3000`*  
 
-4. **Trigger a Test Build**  
-   Open the Dashboard in your browser and click **"Trigger Sample Build"**.  
+4. **Open the Dashboard & Run a Demo**  
+   Open `http://localhost:3000`, pick a scenario from the **🎯 Demo Scenario** dropdown, and click **▶ Run Build**.  
+
+> 💡 **Or skip local setup entirely** — use the live deployment:  
+> **[https://system-orchestrator.onrender.com](https://system-orchestrator.onrender.com)**  
 
 ---  
 
