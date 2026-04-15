@@ -1,3 +1,6 @@
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,11 +56,70 @@
             /* Neon glow */
         }
 
+        /* ---- Scenario Picker ---- */
+        .scenario-picker {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .scenario-picker label {
+            font-weight: bold;
+            color: var(--accent);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .scenario-picker select {
+            background-color: #0d1117;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            min-width: 250px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .scenario-picker select:hover,
+        .scenario-picker select:focus {
+            border-color: var(--accent);
+        }
+
+        .scenario-description {
+            font-size: 12px;
+            color: #8b949e;
+            flex: 1;
+            min-width: 200px;
+            line-height: 1.5;
+        }
+
+        .scenario-info {
+            font-size: 11px;
+            color: var(--accent);
+            background-color: rgba(88, 166, 255, 0.08);
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
         .dashboard-grid {
             display: grid;
             grid-template-columns: 350px 1fr;
             gap: 20px;
-            height: calc(100vh - 120px);
+            height: calc(100vh - 220px);
         }
 
         .card {
@@ -170,10 +232,18 @@
             font-family: inherit;
             font-weight: bold;
             transition: 0.2s;
+            font-size: 13px;
         }
 
         .btn-primary:hover {
             background-color: #2ea043;
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         @keyframes pulse {
@@ -199,8 +269,18 @@
                 <h1>⚡ Build Orchestrator</h1>
                 <small style="color: #8b949e;">Major Project v1.0 • Connected to Engine</small>
             </div>
-            <button onclick="triggerSampleBuild()" class="btn-primary">▶ Run Test Build</button>
+            <button id="runBtn" onclick="triggerSelectedBuild()" class="btn-primary">▶ Run Build</button>
         </header>
+
+        <!-- Scenario Picker Bar -->
+        <div class="scenario-picker">
+            <label for="scenarioSelector">🎯 Demo Scenario:</label>
+            <select id="scenarioSelector" onchange="updateScenarioDescription()">
+                <!-- Options populated by app.js -->
+            </select>
+            <span id="scenarioDescription" class="scenario-description">Select a scenario to see details...</span>
+            <span id="scenarioInfo" class="scenario-info">📊 — tasks • ⚡ — parallel • 📐 — layers</span>
+        </div>
 
         <div class="dashboard-grid">
             <!-- Sidebar: Recent Builds -->
@@ -220,7 +300,7 @@
                     CONSOLE OUTPUT
                     <span id="currentStatus" class="status-badge pending">IDLE</span>
                 </div>
-                <div id="logs">// Waiting for selection...</div>
+                <div id="logs">// Select a scenario above and press "▶ Run Build" to start a demo...</div>
             </div>
         </div>
     </div>
